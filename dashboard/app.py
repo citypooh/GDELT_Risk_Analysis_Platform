@@ -269,7 +269,7 @@ def fetch_latest_gdelt_news():
                 parts = str(url).rstrip("/").split("/")
                 slug = parts[-1].split(".")[0]
                 title = slug.replace("-", " ").replace("_", " ").title()
-                return title[:60] if title else str(url)[:60]
+                return title[:150] if title else str(url)[:150]
             except:
                 return str(url)[:60]
 
@@ -283,8 +283,10 @@ def fetch_latest_gdelt_news():
         df = df[~df["title"].str.match(r"^[A-Fa-f0-9\s]+$", na=False)]  # no hex
         df = df[~df["title"].str.match(r"^[A-Z][a-z]* \d+$", na=False)]  # no "Article 893559"
         df = df[df["title"].str.replace(r"[^a-zA-Z]", "", regex=True).str.len() > 10]  # enough letters
-        df["time"] = pd.to_datetime(df["date"].astype(str), format="%Y%m%d%H%M%S", errors="coerce")
-        df = df.dropna(subset=["time"]).sort_values("time", ascending=False)
+        df["time"] = pd.to_datetime(df["date"].astype(str), format="%Y%m%d%H%M%S", errors="coerce", utc=True).dt.tz_convert("America/New_York")
+        df = df.dropna(subset=["time"])
+        df["time"] = df["time"].dt.strftime("%H:%M ET")
+        df = df.sort_values("time", ascending=False)
         return df.head(10)[["time", "title", "source", "category"]].reset_index(drop=True)
     except Exception as e:
         return pd.DataFrame(columns=["time", "title", "source", "category"])
@@ -403,19 +405,36 @@ with tab1:
             (now_et.hour, now_et.minute) >= (9, 30) and
             now_et.hour < 16
         )
-        if market_open:
-            # Live mode: show today's GDELT tension + VIX
+        if True:  # Always show live tension
+            # Live mode: show today's GDELT tension
             import sqlite3
             DB_PATH = "/home/jj4335_nyu_edu/dashboard_data/live_tension.db"
             try:
                 conn = sqlite3.connect(DB_PATH)
-                live_df = pd.read_sql(
-                    "SELECT timestamp, tension_score FROM live_tension WHERE timestamp >= date('now') ORDER BY timestamp",
-                    conn, parse_dates=["timestamp"]
-                )
+                live_df = pd.read_sql("SELECT timestamp, tension_score FROM live_tension WHERE date(timestamp) >= date('now') ORDER BY timestamp", conn, parse_dates=["timestamp"])
                 conn.close()
             except:
                 live_df = pd.DataFrame(columns=["timestamp", "tension_score"])
+
+
+
+
+
+
+
+                live_df = pd.DataFrame(columns=["timestamp", "tension_score"])
+
+
+
+
+
+
+
+
+
+
+
+
             if len(live_df) > 0:
                 fig.add_trace(go.Scatter(
                     x=live_df["timestamp"], y=live_df["tension_score"],
@@ -432,6 +451,7 @@ with tab1:
                     vix_live = vix_live["Close"].reset_index()
                     vix_live.columns = ["datetime", "vix"]
                     vix_live["datetime"] = pd.to_datetime(vix_live["datetime"], utc=True).dt.tz_localize(None)
+                    vix_live = vix_live[(vix_live["datetime"].dt.hour >= 9) & ((vix_live["datetime"].dt.hour > 9) | (vix_live["datetime"].dt.minute >= 30)) & (vix_live["datetime"].dt.hour < 16)]
                     fig.add_trace(go.Scatter(
                         x=vix_live["datetime"], y=vix_live["vix"],
                         mode="lines", name="VIX",
@@ -518,11 +538,9 @@ with tab1:
             (news_df["title"].str.contains(" ", na=False)) &
             (news_df["title"].str.replace(r"[^a-zA-Z]", "", regex=True).str.len() > 15)
         ] if len(news_df) > 0 else news_df
-
-
         if len(news_df_filtered) > 0:
             for _, row in news_df_filtered.head(6).iterrows():
-                time_str = row["time"].strftime("%H:%M UTC") if pd.notna(row["time"]) else ""
+                time_str = row["time"] if pd.notna(row["time"]) else ""
                 cat = row["category"]
                 tag_cls = tag_classes.get(cat, "tag-other")
                 title = str(row["title"]) if pd.notna(row["title"]) else "Unknown"
@@ -535,11 +553,6 @@ with tab1:
             news_html += "<p style='color:#888;font-size:13px'>No recent events found.</p>"
         news_html += "</div>"
         st.markdown(news_html, unsafe_allow_html=True)
-
-    st.caption("Source: GDELT (live) + S&P 500 2016–2026 | NYU Big Data Project")
-
-# ══════════════════════════════════════════════════════════════════
-# TAB 2: HISTORICAL EVENTS
 # ══════════════════════════════════════════════════════════════════
 with tab2:
     st.markdown("## 📅 Historical Geopolitical Spike Events")
