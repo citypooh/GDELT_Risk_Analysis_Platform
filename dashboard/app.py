@@ -290,6 +290,33 @@ def fetch_latest_gdelt_news():
     except Exception as e:
         return pd.DataFrame(columns=["time", "title", "source", "category"])
 
+# The dashboard reads the batch pipeline's output from the local filesystem, not from HDFS.
+# Fail with instructions rather than a stack trace when it has not been copied down yet.
+_REQUIRED = {
+    "geo_tension_index.parquet": "geo_tension_index",
+    "spike_events.parquet": "spike_events",
+    "ticker_summary.parquet": "ticker_summary",
+    "ticker_reaction_by_spike": "ticker_reaction_by_spike",
+}
+_missing = [name for name in _REQUIRED if not os.path.exists(os.path.join(DATA_DIR, name))]
+
+if _missing:
+    st.error(f"No pipeline output found in `{DATA_DIR}`.")
+    st.markdown(
+        "This dashboard renders results produced by the PySpark jobs in `pyspark_pipeline/`; "
+        "it does not compute them on the fly. Point `GDELT_DATA_DIR` at an existing copy, or "
+        "run the pipeline and copy its output down from HDFS:\n\n"
+        + "```bash\n"
+        + f'export GDELT_DATA_DIR="{DATA_DIR}"\n'
+        + "\n".join(
+            f'hdfs dfs -get "$GDELT_HDFS_BASE/{src}" "$GDELT_DATA_DIR/{name}"'
+            for name, src in _REQUIRED.items()
+        )
+        + "\n```\n\n"
+        + "Missing: " + ", ".join(f"`{m}`" for m in _missing)
+    )
+    st.stop()
+
 # Load all data
 geo_tension = load_geo_tension()
 spike_events = load_spike_events()

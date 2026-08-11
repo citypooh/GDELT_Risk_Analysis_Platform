@@ -35,11 +35,6 @@ No machine learning. No prediction. Pure large-scale data engineering — fully 
 | Jonghyun Jeong | jj4335 |
 | Tinos Vafias | cv2134 |
 
-A note on commit history: much of the work was done directly on the shared Dataproc cluster, where
-git was never configured with our identities. Sixteen commits are therefore authored by
-`Your Name <you@example.com>` and GitHub attributes them to nobody. The commit graph is not a
-reliable record of who wrote what on this project.
-
 ---
 
 ## Architecture
@@ -99,7 +94,8 @@ GDELT_Risk_Analysis_Platform/
 ├── docs/
 │   ├── Final_Paper.pdf            # Full write-up
 │   └── Final_Presentation.pdf     # Slide deck
-└── requirements.txt
+├── requirements.txt               # Dashboard dependencies
+└── requirements-pipeline.txt      # Adds PySpark for local batch development
 ```
 
 ---
@@ -314,7 +310,8 @@ VIX and the Geo-Tension Index often move together during major geopolitical even
 ### Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt            # dashboard
+pip install -r requirements-pipeline.txt   # adds PySpark, only to run the batch jobs locally
 ```
 
 ### Configure Paths

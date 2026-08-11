@@ -8,6 +8,5 @@ requests>=2.31
 yfinance>=0.2.40
 pytz>=2024.1
 
-# Batch pipeline (pyspark_pipeline/*.py)
-# Provided by the Dataproc cluster; install locally only for development.
-pyspark>=3.5
+# The batch jobs in pyspark_pipeline/ need PySpark, which the Dataproc cluster
+# already provides. Install requirements-pipeline.txt only to develop them locally.

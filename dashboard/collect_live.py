@@ -13,6 +13,8 @@ DATA_DIR = os.environ.get("GDELT_DATA_DIR", os.path.expanduser("~/dashboard_data
 DB_PATH = os.path.join(DATA_DIR, "live_tension.db")
 
 def init_db():
+    # sqlite3 will not create missing parent directories for us.
+    os.makedirs(DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS live_tension (

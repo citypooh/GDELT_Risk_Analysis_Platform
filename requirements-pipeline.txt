@@ -1,0 +1,4 @@
+# Batch pipeline (pyspark_pipeline/*.py) — only needed to run the Spark jobs
+# locally. On Dataproc, spark-submit supplies PySpark and this is unnecessary.
+-r requirements.txt
+pyspark>=3.5
