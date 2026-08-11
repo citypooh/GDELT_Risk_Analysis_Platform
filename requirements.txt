@@ -1,0 +1,13 @@
+# Dashboard (dashboard/app.py, dashboard/collect_live.py)
+streamlit>=1.30
+plotly>=5.18
+pandas>=2.0
+numpy>=1.24
+pyarrow>=14.0
+requests>=2.31
+yfinance>=0.2.40
+pytz>=2024.1
+
+# Batch pipeline (pyspark_pipeline/*.py)
+# Provided by the Dataproc cluster; install locally only for development.
+pyspark>=3.5

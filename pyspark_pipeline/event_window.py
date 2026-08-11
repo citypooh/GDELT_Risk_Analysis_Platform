@@ -1,6 +1,14 @@
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+
+# Set GDELT_HDFS_BASE to point the pipeline at a different cluster account.
+HDFS_BASE = os.environ.get(
+    "GDELT_HDFS_BASE",
+    f"hdfs:///user/{os.environ.get('USER', 'hadoop')}/gdelt_project",
+)
 
 spark = SparkSession.builder \
     .appName("EventWindowAggregation") \
@@ -9,7 +17,7 @@ spark = SparkSession.builder \
 
 # ── 1. Load spike events ──────────────────────────────────────────
 spike_events = spark.read.parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/spike_events/"
+    f"{HDFS_BASE}/spike_events/"
 ).select("date", "geo_tension_index", "dominant_category") \
  .withColumnRenamed("date", "spike_date")
 
@@ -21,17 +29,17 @@ sp500 = spark.read \
     .option("datetimeRebaseMode", "CORRECTED") \
     .option("int96RebaseMode", "CORRECTED") \
     .parquet(
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2016.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2017.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2018.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2019.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2020.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2021.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2022.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2023.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2024.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2025.parquet",
-        "hdfs:///user/jj4335_nyu_edu/gdelt_project/sp500_converted/sp500_2026.parquet"
+        f"{HDFS_BASE}/sp500_converted/sp500_2016.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2017.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2018.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2019.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2020.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2021.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2022.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2023.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2024.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2025.parquet",
+        f"{HDFS_BASE}/sp500_converted/sp500_2026.parquet"
     )
 
 ticker_cols = [c for c in sp500.columns if c != "Date"]
@@ -115,15 +123,15 @@ ticker_reaction_by_spike.show(10)
 
 # ── 8. Save results ───────────────────────────────────────────────
 ticker_reaction_by_spike.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/ticker_reaction_by_spike/"
+    f"{HDFS_BASE}/ticker_reaction_by_spike/"
 )
 
 ticker_reaction.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/ticker_reaction/"
+    f"{HDFS_BASE}/ticker_reaction/"
 )
 
 ticker_summary.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/ticker_summary/"
+    f"{HDFS_BASE}/ticker_summary/"
 )
 
 print("Done!")

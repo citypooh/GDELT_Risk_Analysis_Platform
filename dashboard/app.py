@@ -76,7 +76,8 @@ SECTOR_MAP = {
     "Airlines":        ["AAL", "UAL", "DAL", "LUV", "NCLH", "RCL", "CCL"],
 }
 
-DATA_DIR = "/home/jj4335_nyu_edu/dashboard_data"
+# Pipeline outputs pulled down from HDFS. Override with GDELT_DATA_DIR.
+DATA_DIR = os.environ.get("GDELT_DATA_DIR", os.path.expanduser("~/dashboard_data"))
 
 # ── Keyword filter for supporting news ───────────────────────────
 import re as _re
@@ -187,9 +188,7 @@ def load_ticker_summary():
 @st.cache_data
 def load_ticker_reaction_by_spike():
     """Load spike-level ticker reaction data."""
-    return pd.read_parquet(
-        os.path.expanduser("~/dashboard_data/ticker_reaction_by_spike/")
-    )
+    return pd.read_parquet(f"{DATA_DIR}/ticker_reaction_by_spike/")
 @st.cache_data(ttl=900)
 def fetch_vix():
     try:
@@ -408,7 +407,7 @@ with tab1:
         if True:  # Always show live tension
             # Live mode: show today's GDELT tension
             import sqlite3
-            DB_PATH = "/home/jj4335_nyu_edu/dashboard_data/live_tension.db"
+            DB_PATH = f"{DATA_DIR}/live_tension.db"
             try:
                 conn = sqlite3.connect(DB_PATH)
                 live_df = pd.read_sql("SELECT timestamp, tension_score FROM live_tension WHERE date(timestamp) >= date('now') ORDER BY timestamp", conn, parse_dates=["timestamp"])
@@ -687,7 +686,7 @@ with tab2:
         # ── Right: Supporting News ────────────────────────────────────────
         with col_right:
             try:
-                spike_news_df = pd.read_parquet(os.path.expanduser("~/dashboard_data/spike_news/"))
+                spike_news_df = pd.read_parquet(f"{DATA_DIR}/spike_news/")
                 spike_dt_hist = datetime.date.fromisoformat(selected_date)
                 news_filtered = spike_news_df[
                     spike_news_df["article_date"].apply(lambda d: abs((d - spike_dt_hist).days) <= 3)

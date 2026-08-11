@@ -3,10 +3,18 @@ Extract news URLs and themes for each spike event (±3 days) from GDELT TSV.
 Saves as parquet for dashboard use.
 """
 
+import os
+import re
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
-import re
+
+# Set GDELT_HDFS_BASE to point the pipeline at a different cluster account.
+HDFS_BASE = os.environ.get(
+    "GDELT_HDFS_BASE",
+    f"hdfs:///user/{os.environ.get('USER', 'hadoop')}/gdelt_project",
+)
 
 spark = SparkSession.builder \
     .appName("SpikeNewsExtract") \
@@ -15,7 +23,7 @@ spark = SparkSession.builder \
 
 # ── 1. Load spike events ──────────────────────────────────────────
 spike_events = spark.read.parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/spike_events/"
+    f"{HDFS_BASE}/spike_events/"
 ).select("date", "dominant_category") \
  .withColumnRenamed("date", "spike_date")
 
@@ -23,7 +31,7 @@ print(f"Spike events: {spike_events.count()}")
 
 # ── 2. Load GDELT TSV ─────────────────────────────────────────────
 gdelt = spark.read.csv(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/gdelt/gdelt_filtered_full.tsv",
+    f"{HDFS_BASE}/gdelt/gdelt_filtered_full.tsv",
     sep="\t", header=False
 ).select(
     F.col("_c1").alias("datetime"),
@@ -84,7 +92,7 @@ result.show(5, truncate=80)
 
 # ── 6. Save ───────────────────────────────────────────────────────
 result.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/spike_news/"
+    f"{HDFS_BASE}/spike_news/"
 )
 
 print("Done!")

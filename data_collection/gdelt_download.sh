@@ -4,7 +4,7 @@
 
 START_YEAR=${1:-2016}
 END_YEAR=${2:-2025}
-OUTPUT_FILE="/home/jj4335_nyu_edu/gdelt_filtered_full.tsv"
+OUTPUT_FILE="${GDELT_OUTPUT_FILE:-$HOME/gdelt_filtered_full.tsv}"
 
 echo "Start: $(date)"
 echo "Downloading GDELT $START_YEAR ~ $END_YEAR"

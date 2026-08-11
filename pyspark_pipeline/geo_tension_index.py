@@ -1,7 +1,15 @@
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
+
+# Set GDELT_HDFS_BASE to point the pipeline at a different cluster account.
+HDFS_BASE = os.environ.get(
+    "GDELT_HDFS_BASE",
+    f"hdfs:///user/{os.environ.get('USER', 'hadoop')}/gdelt_project",
+)
 
 spark = SparkSession.builder \
     .appName("GeoTensionIndex") \
@@ -21,7 +29,7 @@ schema = StructType([
 ])
 
 df = spark.read.csv(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/gdelt/gdelt_filtered_full.tsv",
+    f"{HDFS_BASE}/gdelt/gdelt_filtered_full.tsv",
     sep="\t", schema=schema
 )
 
@@ -112,12 +120,12 @@ spike_events.orderBy(F.col("geo_tension_index").desc()).show(10)
 # ── 9. Save to HDFS ──────────────────────────────────────────────
 daily.select("date", "geo_tension_index", "total_events", "dominant_category") \
      .write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/geo_tension_index/"
+    f"{HDFS_BASE}/geo_tension_index/"
 )
 
 spike_events.select("date", "geo_tension_index", "total_events", "threshold", "is_spike", "dominant_category") \
             .write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/spike_events/"
+    f"{HDFS_BASE}/spike_events/"
 )
 
 print("Done!")

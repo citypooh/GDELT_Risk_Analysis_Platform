@@ -8,6 +8,8 @@ A big data platform that processes 10 years of GDELT global news data alongside 
 **Cluster:** NYU Dataproc (Google Cloud, YARN)  
 **Dashboard:** Streamlit + Plotly
 
+**Paper:** [`docs/Final_Paper.pdf`](docs/Final_Paper.pdf) · **Slides:** [`docs/Final_Presentation.pdf`](docs/Final_Presentation.pdf)
+
 ---
 
 ## Overview
@@ -33,40 +35,49 @@ No machine learning. No prediction. Pure large-scale data engineering — fully 
 | Jonghyun Jeong | jj4335 |
 | Tinos Vafias | cv2134 |
 
+A note on commit history: much of the work was done directly on the shared Dataproc cluster, where
+git was never configured with our identities. Sixteen commits are therefore authored by
+`Your Name <you@example.com>` and GitHub attributes them to nobody. The commit graph is not a
+reliable record of who wrote what on this project.
+
 ---
 
 ## Architecture
 
-```
-GDELT Archive (2016–2026)          S&P 500 Price Data (yfinance)
-        |                                       |
-        v                                       v
-  Download + Filter                     Chunk collection
-  (simultaneous, xargs -P 4)            (Parquet format)
-        |                                       |
-        +-------------------+-------------------+
-                            |
-                            v
-              HDFS: /user/jj4335_nyu_edu/gdelt_project/
-                            |
-                            v
-                   PySpark ETL Pipeline
-                   - Daily Geo-Tension Index
-                   - Tension spike detection
-                   - ±30-day event window aggregation
-                   - Spike news extraction
-                            |
-              +-------------+-------------+
-              |                           |
-              v                           v
-     Reaction Pattern Dataset       Spike News Archive
-       (Parquet, per spike)          (TSV, per spike ±3d)
-              |                           |
-              +-------------+-------------+
-                            |
-                            v
-                  Streamlit Dashboard
-                  (Historical Event Explorer + Live Feed)
+The platform runs on a two-speed pipeline. A batch layer processes a decade of history on Spark; a
+live layer polls GDELT every 15 minutes. The dashboard sits on top of both at once, so a user sees
+ten years of context and what is happening right now in the same interface.
+
+```mermaid
+flowchart TD
+    subgraph batch["Batch pipeline — a decade of history"]
+        A["GDELT GKG archive<br/>2016–2026 · ~2 TB"]
+        C["Stock prices<br/>yfinance · 500 tickers"]
+        B["gdelt_download.sh<br/>download + keyword filter<br/>~2 TB → ~5 GB"]
+        D[("HDFS<br/>$GDELT_HDFS_BASE")]
+        E["geo_tension_index.py<br/>daily index + 3σ spike detection"]
+        F["event_window.py<br/>ticker reactions ±30d"]
+        G["spike_news_extract.py<br/>supporting news ±3d"]
+        H["risk_engine.py<br/>sector aggregation"]
+        I[("Parquet<br/>index · spikes · reactions · news")]
+        A --> B --> D
+        C --> D
+        D --> E --> F --> H --> I
+        E --> G --> I
+    end
+
+    subgraph live["Live pipeline — every 15 minutes"]
+        J["GDELT lastupdate.txt"]
+        K["collect_live.py<br/>real-time scorer"]
+        L[("SQLite<br/>live_tension.db")]
+        M["Sector ETFs<br/>yfinance · 1-min cache"]
+        J --> K --> L
+    end
+
+    Z["Streamlit dashboard — app.py<br/>Live view + Historical event explorer"]
+    I --> Z
+    L --> Z
+    M --> Z
 ```
 
 ---
@@ -74,16 +85,21 @@ GDELT Archive (2016–2026)          S&P 500 Price Data (yfinance)
 ## Repository Structure
 
 ```
-gdelt-risk-platform/
+GDELT_Risk_Analysis_Platform/
 ├── data_collection/
 │   └── gdelt_download.sh          # Downloads & filters GDELT GKG (2016–2026)
 ├── pyspark_pipeline/
-│   ├── geo_tension_index.py       # Builds daily Geo-Tension Index
+│   ├── geo_tension_index.py       # Builds daily Geo-Tension Index + detects spikes
 │   ├── event_window.py            # Computes ticker reactions ±30d per spike
 │   ├── risk_engine.py             # Aggregates sector-level risk scores
 │   └── spike_news_extract.py      # Extracts news URLs per spike event
-└── dashboard/
-    └── app.py                     # Streamlit dashboard (2 tabs)
+├── dashboard/
+│   ├── app.py                     # Streamlit dashboard (2 tabs)
+│   └── collect_live.py            # 15-min live GDELT collector → SQLite
+├── docs/
+│   ├── Final_Paper.pdf            # Full write-up
+│   └── Final_Presentation.pdf     # Slide deck
+└── requirements.txt
 ```
 
 ---
@@ -298,17 +314,50 @@ VIX and the Geo-Tension Index often move together during major geopolitical even
 ### Install Dependencies
 
 ```bash
-pip install streamlit plotly pandas yfinance
+pip install -r requirements.txt
+```
+
+### Configure Paths
+
+Both layers read their locations from environment variables, so nothing is tied to a particular
+cluster account. The defaults work if you keep the conventional layout.
+
+| Variable | Used by | Default |
+|----------|---------|---------|
+| `GDELT_HDFS_BASE` | `pyspark_pipeline/*.py` | `hdfs:///user/$USER/gdelt_project` |
+| `GDELT_DATA_DIR` | `dashboard/app.py`, `dashboard/collect_live.py` | `~/dashboard_data` |
+| `GDELT_OUTPUT_FILE` | `data_collection/gdelt_download.sh` | `$HOME/gdelt_filtered_full.tsv` |
+
+```bash
+export GDELT_HDFS_BASE="hdfs:///user/$USER/gdelt_project"
+export GDELT_DATA_DIR="$HOME/dashboard_data"
+```
+
+The dashboard reads Parquet from `GDELT_DATA_DIR`, not from HDFS directly, so copy the pipeline
+outputs down first:
+
+```bash
+hdfs dfs -get "$GDELT_HDFS_BASE/geo_tension_index"        "$GDELT_DATA_DIR/geo_tension_index.parquet"
+hdfs dfs -get "$GDELT_HDFS_BASE/spike_events"             "$GDELT_DATA_DIR/spike_events.parquet"
+hdfs dfs -get "$GDELT_HDFS_BASE/ticker_summary"           "$GDELT_DATA_DIR/ticker_summary.parquet"
+hdfs dfs -get "$GDELT_HDFS_BASE/ticker_reaction_by_spike" "$GDELT_DATA_DIR/"
+hdfs dfs -get "$GDELT_HDFS_BASE/spike_news"               "$GDELT_DATA_DIR/"
 ```
 
 ### Run Dashboard
 
 ```bash
+# Optional: start the 15-minute live collector in the background
+python dashboard/collect_live.py &
+
 streamlit run dashboard/app.py --server.port 8501 --theme.base light
 ```
+
+The Historical Events tab needs the Parquet files above. The Live Dashboard tab only needs network
+access, since it polls GDELT and yfinance directly.
 
 ### Expose via ngrok
 
 ```bash
-~/ngrok http 8501
+ngrok http 8501
 ```

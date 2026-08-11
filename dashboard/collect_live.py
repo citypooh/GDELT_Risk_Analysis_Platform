@@ -2,13 +2,15 @@
 Collect live GDELT data every 15 minutes and compute Geo-Tension score.
 Saves to SQLite for dashboard display.
 """
-import requests, zipfile, io, sqlite3, time, re
+import requests, zipfile, io, os, sqlite3, time, re
 import pandas as pd
 import numpy as np
 from datetime import datetime
 import pytz
 
-DB_PATH = "/home/jj4335_nyu_edu/dashboard_data/live_tension.db"
+# Must match the dashboard's GDELT_DATA_DIR so both read the same SQLite file.
+DATA_DIR = os.environ.get("GDELT_DATA_DIR", os.path.expanduser("~/dashboard_data"))
+DB_PATH = os.path.join(DATA_DIR, "live_tension.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)

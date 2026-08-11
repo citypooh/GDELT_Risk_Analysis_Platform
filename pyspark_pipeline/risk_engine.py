@@ -1,6 +1,14 @@
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
+
+# Set GDELT_HDFS_BASE to point the pipeline at a different cluster account.
+HDFS_BASE = os.environ.get(
+    "GDELT_HDFS_BASE",
+    f"hdfs:///user/{os.environ.get('USER', 'hadoop')}/gdelt_project",
+)
 
 spark = SparkSession.builder \
     .appName("PortfolioRiskEngine") \
@@ -9,7 +17,7 @@ spark = SparkSession.builder \
 
 # ── 1. Load ticker summary (precomputed reaction patterns) ────────
 ticker_summary = spark.read.parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/ticker_summary/"
+    f"{HDFS_BASE}/ticker_summary/"
 )
 
 # ── 2. Define sample portfolio ────────────────────────────────────
@@ -60,11 +68,11 @@ most_exposed.show()
 
 # ── 6. Save risk summary ──────────────────────────────────────────
 risk_summary.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/portfolio_risk_summary/"
+    f"{HDFS_BASE}/portfolio_risk_summary/"
 )
 
 most_exposed.write.mode("overwrite").parquet(
-    "hdfs:///user/jj4335_nyu_edu/gdelt_project/portfolio_exposure/"
+    f"{HDFS_BASE}/portfolio_exposure/"
 )
 
 print("Done!")
